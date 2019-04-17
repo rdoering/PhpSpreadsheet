@@ -4,19 +4,10 @@ namespace PhpOffice\PhpSpreadsheet\Reader;
 
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Cell\Hyperlink;
+use PhpOffice\PhpSpreadsheet\Document\Properties;
 use PhpOffice\PhpSpreadsheet\NamedRange;
 use PhpOffice\PhpSpreadsheet\Reader\Security\XmlScanner;
-use PhpOffice\PhpSpreadsheet\Reader\Xlsx\AutoFilter;
 use PhpOffice\PhpSpreadsheet\Reader\Xlsx\Chart;
-use PhpOffice\PhpSpreadsheet\Reader\Xlsx\ColumnAndRowAttributes;
-use PhpOffice\PhpSpreadsheet\Reader\Xlsx\ConditionalStyles;
-use PhpOffice\PhpSpreadsheet\Reader\Xlsx\DataValidations;
-use PhpOffice\PhpSpreadsheet\Reader\Xlsx\Hyperlinks;
-use PhpOffice\PhpSpreadsheet\Reader\Xlsx\PageSetup;
-use PhpOffice\PhpSpreadsheet\Reader\Xlsx\Properties as PropertyReader;
-use PhpOffice\PhpSpreadsheet\Reader\Xlsx\SheetViewOptions;
-use PhpOffice\PhpSpreadsheet\Reader\Xlsx\SheetViews;
-use PhpOffice\PhpSpreadsheet\Reader\Xlsx\Styles;
 use PhpOffice\PhpSpreadsheet\ReferenceHelper;
 use PhpOffice\PhpSpreadsheet\RichText\RichText;
 use PhpOffice\PhpSpreadsheet\Settings;
@@ -29,9 +20,11 @@ use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Borders;
 use PhpOffice\PhpSpreadsheet\Style\Color;
+use PhpOffice\PhpSpreadsheet\Style\Conditional;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use PhpOffice\PhpSpreadsheet\Style\Protection;
 use PhpOffice\PhpSpreadsheet\Style\Style;
+use PhpOffice\PhpSpreadsheet\Worksheet\AutoFilter\Column;
 use PhpOffice\PhpSpreadsheet\Worksheet\HeaderFooterDrawing;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use SimpleXMLElement;
@@ -59,7 +52,7 @@ class Xlsx extends BaseReader
      */
     public function __construct()
     {
-        parent::__construct();
+        $this->readFilter = new DefaultReadFilter();
         $this->referenceHelper = ReferenceHelper::getInstance();
         $this->securityScanner = XmlScanner::getInstance($this);
     }
@@ -331,6 +324,60 @@ class Xlsx extends BaseReader
     }
 
     /**
+     * Set Worksheet column attributes by attributes array passed.
+     *
+     * @param Worksheet $docSheet
+     * @param string $column A, B, ... DX, ...
+     * @param array $columnAttributes array of attributes (indexes are attribute name, values are value)
+     *                               'xfIndex', 'visible', 'collapsed', 'outlineLevel', 'width', ... ?
+     */
+    private function setColumnAttributes(Worksheet $docSheet, $column, array $columnAttributes)
+    {
+        if (isset($columnAttributes['xfIndex'])) {
+            $docSheet->getColumnDimension($column)->setXfIndex($columnAttributes['xfIndex']);
+        }
+        if (isset($columnAttributes['visible'])) {
+            $docSheet->getColumnDimension($column)->setVisible($columnAttributes['visible']);
+        }
+        if (isset($columnAttributes['collapsed'])) {
+            $docSheet->getColumnDimension($column)->setCollapsed($columnAttributes['collapsed']);
+        }
+        if (isset($columnAttributes['outlineLevel'])) {
+            $docSheet->getColumnDimension($column)->setOutlineLevel($columnAttributes['outlineLevel']);
+        }
+        if (isset($columnAttributes['width'])) {
+            $docSheet->getColumnDimension($column)->setWidth($columnAttributes['width']);
+        }
+    }
+
+    /**
+     * Set Worksheet row attributes by attributes array passed.
+     *
+     * @param Worksheet $docSheet
+     * @param int $row 1, 2, 3, ... 99, ...
+     * @param array $rowAttributes array of attributes (indexes are attribute name, values are value)
+     *                               'xfIndex', 'visible', 'collapsed', 'outlineLevel', 'rowHeight', ... ?
+     */
+    private function setRowAttributes(Worksheet $docSheet, $row, array $rowAttributes)
+    {
+        if (isset($rowAttributes['xfIndex'])) {
+            $docSheet->getRowDimension($row)->setXfIndex($rowAttributes['xfIndex']);
+        }
+        if (isset($rowAttributes['visible'])) {
+            $docSheet->getRowDimension($row)->setVisible($rowAttributes['visible']);
+        }
+        if (isset($rowAttributes['collapsed'])) {
+            $docSheet->getRowDimension($row)->setCollapsed($rowAttributes['collapsed']);
+        }
+        if (isset($rowAttributes['outlineLevel'])) {
+            $docSheet->getRowDimension($row)->setOutlineLevel($rowAttributes['outlineLevel']);
+        }
+        if (isset($rowAttributes['rowHeight'])) {
+            $docSheet->getRowDimension($row)->setRowHeight($rowAttributes['rowHeight']);
+        }
+    }
+
+    /**
      * Loads Spreadsheet from file.
      *
      * @param string $pFilename
@@ -409,8 +456,6 @@ class Xlsx extends BaseReader
             'SimpleXMLElement',
             Settings::getLibXmlLoaderOptions()
         );
-
-        $propertyReader = new PropertyReader($this->securityScanner, $excel->getProperties());
         foreach ($rels->Relationship as $rel) {
             switch ($rel['Type']) {
                 case 'http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties':
@@ -916,8 +961,10 @@ class Xlsx extends BaseReader
                                     $relPath = File::realpath(dirname("$dir/$fileWorksheet") . '/' . $relPath);
 
                                     try {
+                                        $secureXml = $this->securityScan($this->getFromZipArchive($zip, $relPath));
+                                        $cleanedXml = str_replace('<br>', '<br/>', $secureXml);
                                         $vmlCommentsFile = simplexml_load_string(
-                                            $this->securityScanner->scan($this->getFromZipArchive($zip, $relPath)),
+                                            $cleanedXml,
                                             'SimpleXMLElement',
                                             Settings::getLibXmlLoaderOptions()
                                         );
