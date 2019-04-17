@@ -916,8 +916,10 @@ class Xlsx extends BaseReader
                                     $relPath = File::realpath(dirname("$dir/$fileWorksheet") . '/' . $relPath);
 
                                     try {
+                                        $secureXml = $this->securityScan($this->getFromZipArchive($zip, $relPath));
+                                        $cleanedXml = str_replace('<br>', '<br/>', $secureXml);
                                         $vmlCommentsFile = simplexml_load_string(
-                                            $this->securityScanner->scan($this->getFromZipArchive($zip, $relPath)),
+                                            $cleanedXml,
                                             'SimpleXMLElement',
                                             Settings::getLibXmlLoaderOptions()
                                         );
