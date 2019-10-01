@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
 
+### Added
+
+### Fixed
+
+- Deal with VML-Comments containing an new-line written by Excel 2013
 
 ## [1.8.2] - 2019-07-08
 
