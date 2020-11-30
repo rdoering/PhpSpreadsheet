@@ -130,6 +130,10 @@ class Styles extends BaseParserClass
 
     private static function readAlignmentStyle(Alignment $alignment, \SimpleXMLElement $alignmentXml)
     {
+        if (!is_array($alignmentXml)) {
+            return;
+        }
+
         $alignment->setHorizontal((string) $alignmentXml->alignment['horizontal']);
         $alignment->setVertical((string) $alignmentXml->alignment['vertical']);
 
@@ -260,6 +264,6 @@ class Styles extends BaseParserClass
 
     private static function getArrayItem($array, $key = 0)
     {
-        return $array[$key] ?? null;
+        return isset($array[$key]) ? $array[$key] : null;
     }
 }
